@@ -8,7 +8,7 @@
 CC       = gcc
 LDR      = gcc
 
-CFLAGS   = -O3 -fopenmp -c
+CFLAGS   = -O3 -fopenmp -pg -c
 
 LDFLAGS  = -O3 -fopenmp -lm
 

@@ -15,7 +15,6 @@
 
 #include "headers.h"
 
-
 //
 const int testIter   = 1000;
 double totalWallTime = 0.0;
