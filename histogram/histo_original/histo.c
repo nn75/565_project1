@@ -389,6 +389,11 @@ long* histogram(char* fn_input) {
 
   /* initalization & reading image file */
   histo = malloc(256*sizeof(long));
+
+  for (i=0; i<256; i++) {
+    histo[i] = 0;
+  }
+  
   image = Image_Read(fn_input);
 
   t_start = omp_get_wtime();

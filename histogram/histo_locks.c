@@ -389,10 +389,14 @@ long* histogram(char* fn_input) {
 
   /* initalization & reading image file */
   histo = malloc(256*sizeof(long));
+  /* init the histo array */
+  for (i=0; i<256; i++) {
+    histo[i] = 0;
+  }
+
   image = Image_Read(fn_input);
 
   t_start = omp_get_wtime();
-
 
   /* init the array of lock */
   omp_lock_t lock_arr[256];
