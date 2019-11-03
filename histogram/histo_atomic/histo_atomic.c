@@ -86,7 +86,7 @@ unsigned char** read_img(char *filename, int *row, int *col,
                          int *imgtype)
 {   
   char     mw[5];
-  char    str[10];      
+  char    str[12];      
   int    com;
   unsigned char**  image;
   int     i, j, maxint;
@@ -400,18 +400,13 @@ long* histogram(char* fn_input) {
   
   /* obtain histogram from image, repeated 100 times */
   for (m=0; m<100; m++) {
-#pragma omp parallel for default(shared) private(i)
+#pragma omp parallel for default(shared) private(i, j) collapse(2)
     for (i=0; i<image->row; i++) {
-#pragma omp parallel for default(shared) private(j)
-	for (j=0; j<image->col; j++) {
-	  int index;
-          #pragma omp atomic read
-	  index = image->content[i][j];
-          #pragma omp atomic update
-	  histo[index]++;
-	}
+      for (j=0; j<image->col; j++) {
+        #pragma omp atomic update
+	histo[image->content[i][j]]++;
       }
-    
+    }
   }
 
   t_end = omp_get_wtime();
@@ -431,15 +426,15 @@ long* histogram(char* fn_input) {
 int main(int argc, char** argv)
 {
   long* histo; 
-
-  if (argc != 2) {
+  int thread_num;
+  
+  if (argc != 3) {
     printf("Usage: main <input-file-name>\n");
-    assert(argc == 2);
+    assert(argc == 3);
   }
 
-  // hardcode thread number for now
-  omp_set_num_threads(4);
-
+  sscanf(argv[2], "%d", &thread_num);
+  omp_set_num_threads(thread_num);
   histo = histogram(argv[1]);
 
   return 0;

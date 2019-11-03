@@ -386,148 +386,42 @@ long* histogram(char* fn_input) {
   int i, j, m;
   long* histo;
   double t_start, t_end;
-  int num_thread = omp_get_max_threads();
 
   /* initalization & reading image file */
   histo = malloc(256*sizeof(long));
-  /* init the histo array */
+
   for (i=0; i<256; i++) {
     histo[i] = 0;
   }
-
+  
   image = Image_Read(fn_input);
- 
+
   t_start = omp_get_wtime();
-  long** histo_matrix;
-  histo_matrix = malloc(num_thread * sizeof(long*));
-  
-  for (i = 0; i < num_thread; i++) {
-    histo_matrix[i] = malloc(256*sizeof(long));
-    for (j = 0; j < 256; j++) {
-      histo_matrix[i][j] = 0;
-    }
+
+  /* init the array of lock */
+  omp_lock_t lock_arr[256];
+  for (i = 0; i < 256; i++) {
+    omp_init_lock(&lock_arr[i]);
   }
-  
+
   /* obtain histogram from image, repeated 100 times */
-  /*
   for (m=0; m<100; m++) {
-#pragma omp parallel
-    {
-      #pragma omp sections
-      {
-	#pragma omp section
-	{
-	  for (i = 0; i < image->row / 2; i++) {
-	    for (j = 0; j < image->col / 2; j++) {
-	      histo1[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = 0; i < image->row; i++) {
-	    for (j = image->col / 2 + 1; j < image->col; j++) {
-	      histo2[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 2 + 1; i < image->row; i++) {
-	    for (j = 0; j < image->col / 2; j++) {
-	      histo3[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 2 + 1; i < image->row; i++) {
-	    for (j = image->col / 2 + 1; j < image->col; j++) {
-	      histo4[image->content[i][j]]++;
-	    }
-	  }
-	}
-      }
-    }
-  }
-  */
-  /*
-  for (m=0; m<100; m++) {
+#pragma omp parallel for default(shared) private(i, j)
     for (i=0; i<image->row; i++) {
       for (j=0; j<image->col; j++) {
+	omp_set_lock(&lock_arr[image->content[i][j]]);
         histo[image->content[i][j]]++;
+	omp_unset_lock(&lock_arr[image->content[i][j]]);        
       }
     }
   }
-  */
-  
-  int block_size, block;
-  block_size = (int) ceil((double) image->col / num_thread);
-  block = 0;
-  for (m = 0; m < 100; m++) {
-#pragma omp parallel for default(shared) private(block, i, j) collapse(2)
-    for (block=0; block < num_thread; block++) {
-      for (i=0; i<image->row; i++) {
-	for (j=block*block_size; j< (int) fmin((block + 1) * block_size, image->col); j++) {
-	  histo_matrix[omp_get_thread_num()][image->content[i][j]]++;
-	}
-      }
-    }
+
+  for (i = 0; i < 256; i++) {
+    omp_destroy_lock(&lock_arr[i]);
   }
-  
-  
-  /*
-  for (m=0; m<100; m++) {
-#pragma omp parallel
-    {
-      #pragma omp sections
-      {
-	#pragma omp section
-	{
-	  for (i = 0; i < image->row / 4; i++) {
-	    for (j = 0; j < image->col; j++) {
-	      histo1[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 4 + 1; i < image->row / 2; i++) {
-	    for (j = 0; j < image->col; j++) {
-	      histo2[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 2 + 1; i < image->row * 3 /4; i++) {
-	    for (j = 0; j < image->col; j++) {
-	      histo3[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row * 3 / 4 + 1; i < image->row; i++) {
-	    for (j = 0; j < image->col; j++) {
-	      histo4[image->content[i][j]]++;
-	    }
-	  }
-	}
-      }
-    }
-  }
-  */
-  for (i = 0; i < num_thread; i++) {
-    for (j = 0; j < 256; j++) {
-      histo[j] += histo_matrix[i][j];
-    }
-    free(histo_matrix[i]);
-  }
-  free(histo_matrix);
-   
+
   t_end = omp_get_wtime();
-  
+
  /* ------- Termination */
   Image_Destroy(&image);
   printf("--- Histogram Content ---\n");
@@ -542,17 +436,16 @@ long* histogram(char* fn_input) {
 
 int main(int argc, char** argv)
 {
-  long* histo;
+  long* histo; 
   int thread_num;
-
+  
   if (argc != 3) {
     printf("Usage: main <input-file-name>\n");
     assert(argc == 3);
   }
-  sscanf (argv[2],"%d",&thread_num);
-  omp_set_num_threads(thread_num);
-    
-  histo = histogram(argv[1]);
 
+  sscanf(argv[2], "%d", &thread_num);
+  omp_set_num_threads(thread_num);
+  histo = histogram(argv[1]);
   return 0;
 }

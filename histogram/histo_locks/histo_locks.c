@@ -86,7 +86,7 @@ unsigned char** read_img(char *filename, int *row, int *col,
                          int *imgtype)
 {   
   char     mw[5];
-  char    str[10];      
+  char    str[12];      
   int    com;
   unsigned char**  image;
   int     i, j, maxint;
@@ -384,72 +384,44 @@ tImage *dupl_image(tImage *image, int row, int col)
 long* histogram(char* fn_input) {
   pImage image;
   int i, j, m;
-  long* histo, *histo1, *histo2, *histo3, *histo4;
+  long* histo;
   double t_start, t_end;
 
   /* initalization & reading image file */
   histo = malloc(256*sizeof(long));
-  /* init the histo array */
+
   for (i=0; i<256; i++) {
     histo[i] = 0;
   }
-
+  
   image = Image_Read(fn_input);
 
   t_start = omp_get_wtime();
 
-  histo1 = malloc(256*sizeof(long));
-  histo2 = malloc(256*sizeof(long));
-  histo3 = malloc(256*sizeof(long));
-  histo4 = malloc(256*sizeof(long));
+  /* init the array of lock */
+  omp_lock_t lock_arr[256];
+  for (i = 0; i < 256; i++) {
+    omp_init_lock(&lock_arr[i]);
+  }
+
   /* obtain histogram from image, repeated 100 times */
   for (m=0; m<100; m++) {
-#pragma omp parallel
-    {
-      #pragma omp sections
-      {
-	#pragma omp section
-	{
-	  for (i = 0; i < image->row / 2; i++) {
-	    for (j = 0; j < image->col / 2; j++) {
-	      histo1[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = 0; i < image->row; i++) {
-	    for (j = image->col / 2 + 1; j < image->col; j++) {
-	      histo2[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 2 + 1; i < image->row; i++) {
-	    for (j = 0; j < image->col / 2; j++) {
-	      histo3[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 2 + 1; i < image->row; i++) {
-	    for (j = image->col / 2 + 1; j < image->col; j++) {
-	      histo4[image->content[i][j]]++;
-	    }
-	  }
-	}
+#pragma omp parallel for default(shared) private(i, j) collapse(2)
+    for (i=0; i<image->row; i++) {
+      for (j=0; j<image->col; j++) {
+	omp_set_lock(&lock_arr[image->content[i][j]]);
+        histo[image->content[i][j]]++;
+	omp_unset_lock(&lock_arr[image->content[i][j]]);        
       }
     }
   }
 
+  for (i = 0; i < 256; i++) {
+    omp_destroy_lock(&lock_arr[i]);
+  }
+
   t_end = omp_get_wtime();
 
-  for (i = 0; i < 256; i++) {
-    histo[i] = histo1[i] + histo2[i] + histo3[i] + histo4[i];
-  }
-  
  /* ------- Termination */
   Image_Destroy(&image);
   printf("--- Histogram Content ---\n");
@@ -465,16 +437,15 @@ long* histogram(char* fn_input) {
 int main(int argc, char** argv)
 {
   long* histo; 
-
-  if (argc != 2) {
+  int thread_num;
+  
+  if (argc != 3) {
     printf("Usage: main <input-file-name>\n");
-    assert(argc == 2);
+    assert(argc == 3);
   }
 
-  // hardcode thread number for now
-  omp_set_num_threads(4);
-
+  sscanf(argv[2], "%d", &thread_num);
+  omp_set_num_threads(thread_num);
   histo = histogram(argv[1]);
-
   return 0;
 }
