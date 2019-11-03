@@ -34,6 +34,7 @@
 
 #include "headers.h"
 #include <assert.h>
+#include <omp.h>
 
 /*--------------------------------------------------------------------------
  * hypre_CSRMatrixMatvec
@@ -104,6 +105,7 @@ hypre_CSRMatrixMatvec( double           alpha,
 
     if (alpha == 0.0)
     {
+#pragma omp parallel for default(shared) private(i)
        for (i = 0; i < num_rows*num_vectors; i++)
           y_data[i] *= beta;
 
@@ -120,11 +122,13 @@ hypre_CSRMatrixMatvec( double           alpha,
    {
       if (temp == 0.0)
       {
+#pragma omp parallel for default(shared) private(i)
 	 for (i = 0; i < num_rows*num_vectors; i++)
 	    y_data[i] = 0.0;
       }
       else
       {
+#pragma omp parallel for default(shared) private(i)
 	 for (i = 0; i < num_rows*num_vectors; i++)
 	    y_data[i] *= temp;
       }
@@ -138,56 +142,52 @@ hypre_CSRMatrixMatvec( double           alpha,
 
    if (num_rownnz < xpar*(num_rows))
    {
-      for (i = 0; i < num_rownnz; i++)
-      {
-         m = A_rownnz[i];
-
-         /*
-          * for (jj = A_i[m]; jj < A_i[m+1]; jj++)
-          * {
-          *         j = A_j[jj];   
-          *  y_data[m] += A_data[jj] * x_data[j];
-          * } */
-         if ( num_vectors==1 )
-         {
-            tempx = y_data[m];
-            for (jj = A_i[m]; jj < A_i[m+1]; jj++) 
-               tempx +=  A_data[jj] * x_data[A_j[jj]];
-            y_data[m] = tempx;
-         }
-         else
-            for ( j=0; j<num_vectors; ++j )
-            {
-               tempx = y_data[ j*vecstride_y + m*idxstride_y ];
-               for (jj = A_i[m]; jj < A_i[m+1]; jj++) 
-                  tempx +=  A_data[jj] * x_data[ j*vecstride_x + A_j[jj]*idxstride_x ];
-               y_data[ j*vecstride_y + m*idxstride_y] = tempx;
-            }
-      }
-
+     if ( num_vectors == 1) {
+#pragma omp parallel for default(shared) private(i, jj, m) reduction(+: tempx) 
+       for (i = 0; i < num_rownnz; i++) {
+	 m = A_rownnz[i];
+	 tempx = y_data[m];
+         for (jj = A_i[m]; jj < A_i[m+1]; jj++)
+	   tempx +=  A_data[jj] * x_data[A_j[jj]];
+         y_data[m] = tempx;
+       }
+     } else {
+#pragma omp parallel for default(shared) private(i, j, jj) reduction(+: tempx)
+       for (i = 0; i < num_rownnz; i++) {
+	 m = A_rownnz[i];
+	 for ( j=0; j<num_vectors; ++j ) {
+	   tempx = y_data[ j*vecstride_y + m*idxstride_y ];
+	   for (jj = A_i[m]; jj < A_i[m+1]; jj++)
+	     tempx +=  A_data[jj] * x_data[ j*vecstride_x + A_j[jj]*idxstride_x ];
+           y_data[ j*vecstride_y + m*idxstride_y] = tempx;
+	 }
+       }
+     }
    }
    else
    {
+     if ( num_vectors == 1) {
+#pragma omp parallel for default(shared) private(i, jj) reduction(+:temp)
       for (i = 0; i < num_rows; i++)
       {
-         if ( num_vectors==1 )
-         {
-            temp = y_data[i];
+	temp = y_data[i];
+        for (jj = A_i[i]; jj < A_i[i+1]; jj++)
+	  temp += A_data[jj] * x_data[A_j[jj]];
+        y_data[i] = temp;       
+     }
+     }else {
+#pragma omp parallel for default(shared) private(i, j, jj) reduction(+: temp)
+	for (i = 0; i < num_rows; i++) {
+	  for (j = 0; j < num_vectors; ++j) {
+	    temp = y_data[ j*vecstride_y + i*idxstride_y ];
             for (jj = A_i[i]; jj < A_i[i+1]; jj++)
-               temp += A_data[jj] * x_data[A_j[jj]];
-            y_data[i] = temp;
-         }
-         else
-            for ( j=0; j<num_vectors; ++j )
-            {
-               temp = y_data[ j*vecstride_y + i*idxstride_y ];
-               for (jj = A_i[i]; jj < A_i[i+1]; jj++)
-               {
-                  temp += A_data[jj] * x_data[ j*vecstride_x + A_j[jj]*idxstride_x ];
-               }
-               y_data[ j*vecstride_y + i*idxstride_y ] = temp;
+	    {
+	      temp += A_data[jj] * x_data[ j*vecstride_x + A_j[jj]*idxstride_x ];
             }
-      }
+            y_data[ j*vecstride_y + i*idxstride_y ] = temp;
+	  }
+	}
+     }
    }
 
 
