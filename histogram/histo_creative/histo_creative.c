@@ -398,6 +398,7 @@ long* histogram(char* fn_input) {
   image = Image_Read(fn_input);
  
   t_start = omp_get_wtime();
+  /*
   long** histo_matrix;
   histo_matrix = malloc(num_thread * sizeof(long*));
   
@@ -407,117 +408,28 @@ long* histogram(char* fn_input) {
       histo_matrix[i][j] = 0;
     }
   }
-  
-  /* obtain histogram from image, repeated 100 times */
-  /*
-  for (m=0; m<100; m++) {
-#pragma omp parallel
-    {
-      #pragma omp sections
-      {
-	#pragma omp section
-	{
-	  for (i = 0; i < image->row / 2; i++) {
-	    for (j = 0; j < image->col / 2; j++) {
-	      histo1[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = 0; i < image->row; i++) {
-	    for (j = image->col / 2 + 1; j < image->col; j++) {
-	      histo2[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 2 + 1; i < image->row; i++) {
-	    for (j = 0; j < image->col / 2; j++) {
-	      histo3[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 2 + 1; i < image->row; i++) {
-	    for (j = image->col / 2 + 1; j < image->col; j++) {
-	      histo4[image->content[i][j]]++;
-	    }
-	  }
-	}
-      }
-    }
-  }
-  */
-  /*
-  for (m=0; m<100; m++) {
-    for (i=0; i<image->row; i++) {
-      for (j=0; j<image->col; j++) {
-        histo[image->content[i][j]]++;
-      }
-    }
-  }
   */
   
   int block_size, block;
   block_size = (int) ceil((double) image->col / num_thread);
   block = 0;
   for (m = 0; m < 100; m++) {
-#pragma omp parallel for default(shared) private(block, i, j) collapse(2)
-    for (block=0; block < num_thread; block++) {
-      for (i=0; i<image->row; i++) {
+#pragma omp parallel for default(shared) private(block, i, j) reduction(+:histo[:256]) collapse(2)
+    for (i=0; i<image->row; i++) {
+      for (block=0; block < num_thread; block++) {
 	for (j=block*block_size; j< (int) fmin((block + 1) * block_size, image->col); j++) {
-	  histo_matrix[omp_get_thread_num()][image->content[i][j]]++;
+	  histo[image->content[i][j]]++;
 	}
       }
+      /*
+      for (j = 0; j < image->col; j++) {
+	histo[image->content[i][j]]++;
+      }
+      */
     }
   }
-  
   
   /*
-  for (m=0; m<100; m++) {
-#pragma omp parallel
-    {
-      #pragma omp sections
-      {
-	#pragma omp section
-	{
-	  for (i = 0; i < image->row / 4; i++) {
-	    for (j = 0; j < image->col; j++) {
-	      histo1[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 4 + 1; i < image->row / 2; i++) {
-	    for (j = 0; j < image->col; j++) {
-	      histo2[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row / 2 + 1; i < image->row * 3 /4; i++) {
-	    for (j = 0; j < image->col; j++) {
-	      histo3[image->content[i][j]]++;
-	    }
-	  }
-	}
-	#pragma omp section
-	{
-	  for (i = image->row * 3 / 4 + 1; i < image->row; i++) {
-	    for (j = 0; j < image->col; j++) {
-	      histo4[image->content[i][j]]++;
-	    }
-	  }
-	}
-      }
-    }
-  }
-  */
   for (i = 0; i < num_thread; i++) {
     for (j = 0; j < 256; j++) {
       histo[j] += histo_matrix[i][j];
@@ -525,7 +437,7 @@ long* histogram(char* fn_input) {
     free(histo_matrix[i]);
   }
   free(histo_matrix);
-   
+  */
   t_end = omp_get_wtime();
   
  /* ------- Termination */
