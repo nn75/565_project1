@@ -387,6 +387,7 @@ long* histogram(char* fn_input) {
   long* histo;
   double t_start, t_end;
 
+  int index;
   /* initalization & reading image file */
   histo = malloc(256*sizeof(long));
 
@@ -406,12 +407,14 @@ long* histogram(char* fn_input) {
 
   /* obtain histogram from image, repeated 100 times */
   for (m=0; m<100; m++) {
-#pragma omp parallel for default(shared) private(i, j) collapse(2)
+    #pragma omp parallel for default(shared) private(i, j, index)
     for (i=0; i<image->row; i++) {
+      //#pragma omp parallel for default(shared) private(j, index)
       for (j=0; j<image->col; j++) {
-	omp_set_lock(&lock_arr[image->content[i][j]]);
-        histo[image->content[i][j]]++;
-	omp_unset_lock(&lock_arr[image->content[i][j]]);        
+	index = image->content[i][j];
+	omp_set_lock(&lock_arr[index]);
+        histo[index]++;
+	omp_unset_lock(&lock_arr[index]);        
       }
     }
   }
