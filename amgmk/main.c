@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 
   int  max_num_threads;
 
-  //omp_set_num_threads(4);
+  omp_set_num_threads(8);
 
   printf("\n");
   printf("//------------ \n");

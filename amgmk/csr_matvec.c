@@ -143,7 +143,7 @@ hypre_CSRMatrixMatvec( double           alpha,
    if (num_rownnz < xpar*(num_rows))
    {
      if ( num_vectors == 1) {
-#pragma omp parallel for default(shared) private(i, jj, m) reduction(+: tempx) 
+#pragma omp parallel for default(shared) private(i, jj, m, tempx) 
        for (i = 0; i < num_rownnz; i++) {
 	 m = A_rownnz[i];
 	 tempx = y_data[m];
@@ -152,10 +152,10 @@ hypre_CSRMatrixMatvec( double           alpha,
          y_data[m] = tempx;
        }
      } else {
-#pragma omp parallel for default(shared) private(i, j, jj) reduction(+: tempx)
+#pragma omp parallel for default(shared) private(i, j, jj, m, tempx) collapse(2)
        for (i = 0; i < num_rownnz; i++) {
-	 m = A_rownnz[i];
 	 for ( j=0; j<num_vectors; ++j ) {
+	   m = A_rownnz[i];
 	   tempx = y_data[ j*vecstride_y + m*idxstride_y ];
 	   for (jj = A_i[m]; jj < A_i[m+1]; jj++)
 	     tempx +=  A_data[jj] * x_data[ j*vecstride_x + A_j[jj]*idxstride_x ];
@@ -167,7 +167,7 @@ hypre_CSRMatrixMatvec( double           alpha,
    else
    {
      if ( num_vectors == 1) {
-#pragma omp parallel for default(shared) private(i, jj) reduction(+:temp)
+#pragma omp parallel for default(shared) private(i, jj, temp) 
       for (i = 0; i < num_rows; i++)
       {
 	temp = y_data[i];
@@ -176,7 +176,7 @@ hypre_CSRMatrixMatvec( double           alpha,
         y_data[i] = temp;       
      }
      }else {
-#pragma omp parallel for default(shared) private(i, j, jj) reduction(+: temp)
+#pragma omp parallel for default(shared) private(i, j, jj, temp) collapse(2)
 	for (i = 0; i < num_rows; i++) {
 	  for (j = 0; j < num_vectors; ++j) {
 	    temp = y_data[ j*vecstride_y + i*idxstride_y ];
